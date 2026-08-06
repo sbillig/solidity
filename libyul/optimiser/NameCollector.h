@@ -72,16 +72,27 @@ private:
 class ReferencesCounter: public ASTWalker
 {
 public:
+	using ReferenceCounts = std::map<FunctionHandle, size_t>;
+
 	using ASTWalker::operator ();
 	void operator()(Identifier const& _identifier) override;
 	void operator()(FunctionCall const& _funCall) override;
 
-	static std::map<FunctionHandle, size_t> countReferences(Block const& _block);
-	static std::map<FunctionHandle, size_t> countReferences(FunctionDefinition const& _function);
-	static std::map<FunctionHandle, size_t> countReferences(Expression const& _expression);
+	static ReferenceCounts countReferences(Block const& _block);
+	static ReferenceCounts countReferences(FunctionDefinition const& _function);
+	static ReferenceCounts countReferences(Expression const& _expression);
+	static bool subtractReferences(Block const& _block, ReferenceCounts& _references);
+	static bool subtractReferences(Expression const& _expression, ReferenceCounts& _references);
 
 private:
-	std::map<FunctionHandle, size_t> m_references;
+	ReferencesCounter() = default;
+	explicit ReferencesCounter(ReferenceCounts& _referencesToSubtractFrom);
+
+	void recordReference(FunctionHandle _reference);
+
+	ReferenceCounts m_references;
+	ReferenceCounts* m_referencesToSubtractFrom = nullptr;
+	bool m_subtractedReference = false;
 };
 
 /**

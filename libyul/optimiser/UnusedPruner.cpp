@@ -63,7 +63,7 @@ void UnusedPruner::operator()(Block& _block)
 			FunctionDefinition& funDef = std::get<FunctionDefinition>(statement);
 			if (!used(funDef.name))
 			{
-				subtractReferences(ReferencesCounter::countReferences(funDef.body));
+				m_shouldRunAgain = ReferencesCounter::subtractReferences(funDef.body, m_references) || m_shouldRunAgain;
 				statement = Block{std::move(funDef.debugData), {}};
 			}
 		}
@@ -89,7 +89,8 @@ void UnusedPruner::operator()(Block& _block)
 					canBeRemoved(m_allowMSizeOptimization)
 				)
 				{
-					subtractReferences(ReferencesCounter::countReferences(*varDecl.value));
+					m_shouldRunAgain =
+						ReferencesCounter::subtractReferences(*varDecl.value, m_references) || m_shouldRunAgain;
 					statement = Block{std::move(varDecl.debugData), {}};
 				}
 				else if (varDecl.variables.size() == 1 && discardFunctionHandle)
@@ -108,7 +109,8 @@ void UnusedPruner::operator()(Block& _block)
 				canBeRemoved(m_allowMSizeOptimization)
 			)
 			{
-				subtractReferences(ReferencesCounter::countReferences(exprStmt.expression));
+				m_shouldRunAgain =
+					ReferencesCounter::subtractReferences(exprStmt.expression, m_references) || m_shouldRunAgain;
 				statement = Block{std::move(exprStmt.debugData), {}};
 			}
 		}
@@ -156,15 +158,4 @@ void UnusedPruner::runUntilStabilisedOnFullAST(
 bool UnusedPruner::used(YulName _name) const
 {
 	return m_references.count(_name) && m_references.at(_name) > 0;
-}
-
-void UnusedPruner::subtractReferences(std::map<FunctionHandle, size_t> const& _subtrahend)
-{
-	for (auto const& ref: _subtrahend)
-	{
-		assertThrow(m_references.count(ref.first), OptimizerException, "");
-		assertThrow(m_references.at(ref.first) >= ref.second, OptimizerException, "");
-		m_references[ref.first] -= ref.second;
-		m_shouldRunAgain = true;
-	}
 }
