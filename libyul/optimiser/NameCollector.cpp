@@ -22,11 +22,16 @@
 #include <libyul/optimiser/NameCollector.h>
 
 #include <libyul/AST.h>
+#include <libyul/Exceptions.h>
 #include <libyul/Utilities.h>
 
 using namespace solidity;
 using namespace solidity::yul;
 using namespace solidity::util;
+
+ReferencesCounter::ReferencesCounter(ReferenceCounts& _referencesToSubtractFrom):
+	m_referencesToSubtractFrom(&_referencesToSubtractFrom)
+{}
 
 void NameCollector::operator()(VariableDeclaration const& _varDecl)
 {
@@ -51,34 +56,63 @@ void NameCollector::operator()(FunctionDefinition const& _funDef)
 
 void ReferencesCounter::operator()(Identifier const& _identifier)
 {
-	++m_references[_identifier.name];
+	recordReference(_identifier.name);
 }
 
 void ReferencesCounter::operator()(FunctionCall const& _funCall)
 {
-	++m_references[functionNameToHandle(_funCall.functionName)];
+	recordReference(functionNameToHandle(_funCall.functionName));
 	ASTWalker::operator()(_funCall);
 }
 
-std::map<FunctionHandle, size_t> ReferencesCounter::countReferences(Block const& _block)
+ReferencesCounter::ReferenceCounts ReferencesCounter::countReferences(Block const& _block)
 {
 	ReferencesCounter counter;
 	counter(_block);
 	return std::move(counter.m_references);
 }
 
-std::map<FunctionHandle, size_t> ReferencesCounter::countReferences(FunctionDefinition const& _function)
+ReferencesCounter::ReferenceCounts ReferencesCounter::countReferences(FunctionDefinition const& _function)
 {
 	ReferencesCounter counter;
 	counter(_function);
 	return std::move(counter.m_references);
 }
 
-std::map<FunctionHandle, size_t> ReferencesCounter::countReferences(Expression const& _expression)
+ReferencesCounter::ReferenceCounts ReferencesCounter::countReferences(Expression const& _expression)
 {
 	ReferencesCounter counter;
 	counter.visit(_expression);
 	return std::move(counter.m_references);
+}
+
+bool ReferencesCounter::subtractReferences(Block const& _block, ReferenceCounts& _references)
+{
+	ReferencesCounter counter{_references};
+	counter(_block);
+	return counter.m_subtractedReference;
+}
+
+bool ReferencesCounter::subtractReferences(Expression const& _expression, ReferenceCounts& _references)
+{
+	ReferencesCounter counter{_references};
+	counter.visit(_expression);
+	return counter.m_subtractedReference;
+}
+
+void ReferencesCounter::recordReference(FunctionHandle _reference)
+{
+	if (!m_referencesToSubtractFrom)
+	{
+		++m_references[_reference];
+		return;
+	}
+
+	auto reference = m_referencesToSubtractFrom->find(_reference);
+	assertThrow(reference != m_referencesToSubtractFrom->end(), OptimizerException, "");
+	assertThrow(reference->second > 0, OptimizerException, "");
+	--reference->second;
+	m_subtractedReference = true;
 }
 
 void VariableReferencesCounter::operator()(Identifier const& _identifier)
