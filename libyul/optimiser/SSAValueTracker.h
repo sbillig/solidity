@@ -27,8 +27,6 @@
 
 #include <libsolutil/UnorderedContainers.h>
 
-#include <set>
-
 namespace solidity::yul
 {
 
@@ -43,6 +41,8 @@ namespace solidity::yul
 class SSAValueTracker: public ASTWalker
 {
 public:
+	using SSAVariables = util::unordered_flat_set<YulName>;
+
 	using ASTWalker::operator();
 	void operator()(FunctionDefinition const& _funDef) override;
 	void operator()(VariableDeclaration const& _varDecl) override;
@@ -51,7 +51,7 @@ public:
 	util::unordered_flat_map<YulName, Expression const*> const& values() const { return m_values; }
 	Expression const* value(YulName _name) const { return m_values.at(_name); }
 
-	static std::set<YulName> ssaVariables(Block const& _ast);
+	static SSAVariables ssaVariables(Block const& _ast);
 
 private:
 	void setValue(YulName _name, Expression const* _value);
