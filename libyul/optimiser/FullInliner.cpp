@@ -53,10 +53,17 @@ void FullInliner::run(OptimiserStepContext& _context, Block& _ast)
 
 FullInliner::FullInliner(Block& _ast, NameDispenser& _dispenser, Dialect const& _dialect):
 	m_ast(_ast),
-	m_recursiveFunctions(CallGraphGenerator::callGraph(_ast).recursiveFunctions()),
 	m_nameDispenser(_dispenser),
 	m_dialect(_dialect)
 {
+	CallGraph callGraph = CallGraphGenerator::callGraph(_ast);
+	m_recursiveFunctions = callGraph.recursiveFunctions();
+	for (auto const& [function, calls]: callGraph.functionCalls)
+		if (std::holds_alternative<YulName>(function))
+			m_directRecursion.emplace(
+				std::get<YulName>(function),
+				util::contains(calls, function)
+			);
 
 	// Determine constants
 	SSAValueTracker tracker;
@@ -118,6 +125,7 @@ void FullInliner::run(Pass _pass)
 	for (FunctionDefinition* fun: functions)
 	{
 		handleBlock(fun->name, fun->body);
+		m_directRecursion.erase(fun->name);
 		updateCodeSize(*fun);
 	}
 
@@ -256,10 +264,15 @@ void FullInliner::handleBlock(YulName _currentFunctionName, Block& _block)
 	InlineModifier{*this, m_nameDispenser, _currentFunctionName, m_dialect}(_block);
 }
 
-bool FullInliner::recursive(FunctionDefinition const& _fun) const
+bool FullInliner::recursive(FunctionDefinition const& _fun)
 {
-	std::map<FunctionHandle, size_t> references = ReferencesCounter::countReferences(_fun);
-	return references[_fun.name] > 0;
+	auto recursion = m_directRecursion.find(_fun.name);
+	if (recursion == m_directRecursion.end())
+	{
+		std::map<FunctionHandle, size_t> references = ReferencesCounter::countReferences(_fun);
+		recursion = m_directRecursion.emplace(_fun.name, references[_fun.name] > 0).first;
+	}
+	return recursion->second;
 }
 
 void InlineModifier::operator()(Block& _block)
