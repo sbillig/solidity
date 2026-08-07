@@ -44,13 +44,16 @@ using namespace solidity::yul;
 DataFlowAnalyzer::DataFlowAnalyzer(
 	Dialect const& _dialect,
 	MemoryAndStorage _analyzeStores,
-	std::map<FunctionHandle, SideEffects> _functionSideEffects
+	std::map<FunctionHandle, SideEffects> _functionSideEffects,
+	ValueKnowledge _valueKnowledge
 ):
 	m_dialect(_dialect),
 	m_functionSideEffects(std::move(_functionSideEffects)),
+	m_valueKnowledge(_valueKnowledge),
 	m_knowledgeBase([this](YulName _var) { return variableValue(_var); }, _dialect),
 	m_analyzeStores(_analyzeStores == MemoryAndStorage::Analyze)
 {
+	yulAssert(m_valueKnowledge == ValueKnowledge::AllMovable || !m_analyzeStores);
 	if (m_analyzeStores)
 	{
 		m_storeFunctionName[static_cast<unsigned>(StoreLoadLocation::Memory)] = _dialect.memoryStoreFunctionHandle();
@@ -245,6 +248,15 @@ void DataFlowAnalyzer::handleAssignment(small_flat_set<YulName, 1> const& _varia
 {
 	if (!_isDeclaration)
 		clearValues(_variables);
+	if (m_valueKnowledge == ValueKnowledge::LiteralsOnly)
+	{
+		if (!_value)
+			for (auto const& variable: _variables)
+				assignValue(variable, &m_zero);
+		else if (_variables.size() == 1 && std::holds_alternative<Literal>(*_value))
+			assignValue(*_variables.begin(), _value);
+		return;
+	}
 
 	MovableChecker movableChecker{m_dialect, &m_functionSideEffects};
 	if (_value)
@@ -319,6 +331,13 @@ void DataFlowAnalyzer::popScope()
 template <class VariableSet>
 void DataFlowAnalyzer::clearValues(VariableSet const& _variablesToClear)
 {
+	if (m_valueKnowledge == ValueKnowledge::LiteralsOnly)
+	{
+		for (auto const& variable: _variablesToClear)
+			m_state.value.erase(variable);
+		return;
+	}
+
 	// All variables that reference variables to be cleared also have to be
 	// cleared, but not recursively, since only the value of the original
 	// variables changes. Example:
