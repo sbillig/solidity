@@ -94,11 +94,14 @@ void UnusedPruner::operator()(Block& _block)
 					statement = Block{std::move(varDecl.debugData), {}};
 				}
 				else if (varDecl.variables.size() == 1 && discardFunctionHandle)
+				{
+					++m_references[*discardFunctionHandle];
 					statement = ExpressionStatement{varDecl.debugData, FunctionCall{
 						varDecl.debugData,
 						BuiltinName{varDecl.debugData, *discardFunctionHandle},
 						{*std::move(varDecl.value)}
 					}};
+				}
 			}
 		}
 		else if (std::holds_alternative<ExpressionStatement>(statement))
@@ -128,19 +131,19 @@ void UnusedPruner::runUntilStabilised(
 	std::set<YulName> const& _externallyUsedFunctions
 )
 {
-	while (true)
+	UnusedPruner pruner(
+		_dialect,
+		_ast,
+		_allowMSizeOptimization,
+		_functionSideEffects,
+		_externallyUsedFunctions
+	);
+	do
 	{
-		UnusedPruner pruner(
-			_dialect,
-			_ast,
-			_allowMSizeOptimization,
-			_functionSideEffects,
-			_externallyUsedFunctions
-		);
+		pruner.m_shouldRunAgain = false;
 		pruner(_ast);
-		if (!pruner.shouldRunAgain())
-			return;
 	}
+	while (pruner.shouldRunAgain());
 }
 
 void UnusedPruner::runUntilStabilisedOnFullAST(
