@@ -23,6 +23,8 @@
 
 #include <libsolutil/UnorderedContainers.h>
 
+#include <boost/container/small_vector.hpp>
+
 #include <deque>
 #include <list>
 
@@ -33,7 +35,7 @@ class Dialect;
 
 struct ControlFlowNode
 {
-	std::vector<ControlFlowNode const*> successors;
+	boost::container::small_vector<ControlFlowNode const*, 2> successors;
 	/// Function call AST node, if present.
 	FunctionCall const* functionCall = nullptr;
 };
