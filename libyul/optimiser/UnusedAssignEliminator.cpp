@@ -127,7 +127,7 @@ void UnusedAssignEliminator::visit(Statement const& _statement)
 		}
 		else
 			for (auto const& var: assignment->variableNames)
-				m_activeStores[var.name].clear();
+				m_activeStores.erase(var.name);
 	}
 }
 
@@ -158,7 +158,10 @@ void UnusedAssignEliminator::finalizeFunctionDefinition(FunctionDefinition const
 
 void UnusedAssignEliminator::markUsed(YulName _variable)
 {
-	for (auto& assignment: m_activeStores[_variable])
+	auto activeStores = m_activeStores.find(_variable);
+	if (activeStores == m_activeStores.end())
+		return;
+	for (auto assignment: activeStores->second)
 		m_usedStores.insert(assignment);
-	m_activeStores.erase(_variable);
+	m_activeStores.erase(activeStores);
 }
