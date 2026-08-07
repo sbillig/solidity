@@ -203,30 +203,27 @@ ControlFlowSideEffectsCollector::ControlFlowSideEffectsCollector(
 
 	// Now it is sufficient to handle the reachable function calls (`m_functionCalls`),
 	// we do not have to consider the control-flow graph anymore.
-	for (auto&& [function, calls]: m_functionCalls)
+	progress = true;
+	while (progress)
 	{
-		yulAssert(function);
-		ControlFlowSideEffects& functionSideEffects = m_functionSideEffects[function];
-		auto _visit = [&, visited = std::set<FunctionDefinition const*>{}](FunctionDefinition const& _function, auto&& _recurse) mutable {
-			// Worst side-effects already, stop searching.
+		progress = false;
+		for (auto&& [function, calls]: m_functionCalls)
+		{
+			yulAssert(function);
+			ControlFlowSideEffects& functionSideEffects = m_functionSideEffects[function];
 			if (functionSideEffects.canTerminate && functionSideEffects.canRevert)
-				return;
-			if (!visited.insert(&_function).second)
-				return;
-
-			for (FunctionCall const* call: m_functionCalls.at(&_function))
+				continue;
+			for (FunctionCall const* call: calls)
 			{
 				ControlFlowSideEffects const& calledSideEffects = sideEffects(*call);
-				if (calledSideEffects.canTerminate)
-					functionSideEffects.canTerminate = true;
-				if (calledSideEffects.canRevert)
-					functionSideEffects.canRevert = true;
-
-				if (m_functionReferences.count(call))
-					_recurse(*m_functionReferences.at(call), _recurse);
+				progress =
+					(!functionSideEffects.canTerminate && calledSideEffects.canTerminate) ||
+					(!functionSideEffects.canRevert && calledSideEffects.canRevert) ||
+					progress;
+				functionSideEffects.canTerminate = functionSideEffects.canTerminate || calledSideEffects.canTerminate;
+				functionSideEffects.canRevert = functionSideEffects.canRevert || calledSideEffects.canRevert;
 			}
-		};
-		_visit(*function, _visit);
+		}
 	}
 }
 
