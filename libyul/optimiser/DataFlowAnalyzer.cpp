@@ -33,6 +33,7 @@
 
 #include <libsolutil/CommonData.h>
 
+#include <algorithm>
 #include <variant>
 
 #include <range/v3/view/reverse.hpp>
@@ -267,13 +268,41 @@ void DataFlowAnalyzer::handleAssignment(AssignmentNames const& _variables, Expre
 		referencedVariables.emplace_back(identifier->name);
 	else if (!std::holds_alternative<Literal>(*_value))
 	{
-		MovableChecker movableChecker{m_dialect, &m_functionSideEffects};
-		movableChecker.visit(*_value);
-		movable = movableChecker.movable();
-		referencedVariables.assign(
-			movableChecker.referencedVariables().begin(),
-			movableChecker.referencedVariables().end()
-		);
+		FunctionCall const& functionCall = std::get<FunctionCall>(*_value);
+		bool shallow = true;
+		for (Expression const& argument: functionCall.arguments)
+			if (Identifier const* identifier = std::get_if<Identifier>(&argument))
+			{
+				auto position = std::lower_bound(referencedVariables.begin(), referencedVariables.end(), identifier->name);
+				if (position == referencedVariables.end() || *position != identifier->name)
+					referencedVariables.insert(position, identifier->name);
+			}
+			else if (!std::holds_alternative<Literal>(argument))
+			{
+				shallow = false;
+				break;
+			}
+
+		if (shallow)
+		{
+			FunctionHandle function = functionNameToHandle(functionCall.functionName);
+			if (BuiltinFunction const* builtin = resolveBuiltinFunction(functionCall.functionName, m_dialect))
+				movable = builtin->sideEffects.movable;
+			else if (auto const sideEffects = m_functionSideEffects.find(function); sideEffects != m_functionSideEffects.end())
+				movable = sideEffects->second.movable;
+			else
+				movable = false;
+		}
+		else
+		{
+			MovableChecker movableChecker{m_dialect, &m_functionSideEffects};
+			movableChecker.visit(*_value);
+			movable = movableChecker.movable();
+			referencedVariables.assign(
+				movableChecker.referencedVariables().begin(),
+				movableChecker.referencedVariables().end()
+			);
+		}
 	}
 
 	if (_value && _variables.size() == 1)
