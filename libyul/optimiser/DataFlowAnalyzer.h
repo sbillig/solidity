@@ -219,7 +219,7 @@ protected:
 	struct Scope
 	{
 		explicit Scope(bool _isFunction): isFunction(_isFunction) {}
-		std::set<YulName> variables;
+		util::unordered_flat_set<YulName> variables;
 		bool isFunction;
 	};
 	/// Special expression whose address will be used in m_value.
