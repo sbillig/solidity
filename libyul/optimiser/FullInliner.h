@@ -102,7 +102,7 @@ private:
 
 	void updateCodeSize(FunctionDefinition const& _fun);
 	void handleBlock(YulName _currentFunctionName, Block& _block);
-	bool recursive(FunctionDefinition const& _fun) const;
+	bool recursive(FunctionDefinition const& _fun);
 
 	Pass m_pass;
 	/// The AST to be modified. The root block itself will not be modified, because
@@ -115,6 +115,8 @@ private:
 	bool m_hasMemoryGuard = false;
 	/// Set of recursive functions.
 	std::set<FunctionHandle> m_recursiveFunctions;
+	/// Whether a function directly calls itself, cached for the current version of its body.
+	std::map<YulName, bool> m_directRecursion;
 	/// Names of functions to always inline.
 	std::set<YulName> m_singleUse;
 	/// Variables that are constants (used for inlining heuristic)
