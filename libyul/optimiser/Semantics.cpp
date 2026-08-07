@@ -146,27 +146,29 @@ std::map<FunctionHandle, SideEffects> SideEffectsPropagator::sideEffects(
 	}
 
 	for (auto const& call: _directCallGraph.functionCalls)
+		ret.try_emplace(call.first);
+
+	// Side effects only get worse when combined, so direct call effects can be
+	// propagated to a fixed point without repeatedly traversing the call graph.
+	bool changed = true;
+	while (changed)
 	{
-		FunctionHandle funName = call.first;
-		SideEffects sideEffects;
-		auto _visit = [&, visited = std::set<FunctionHandle>{}](FunctionHandle _function, auto&& _recurse) mutable {
-			if (!visited.insert(_function).second)
-				return;
+		changed = false;
+		for (auto const& [function, calls]: _directCallGraph.functionCalls)
+		{
+			SideEffects& sideEffects = ret.at(function);
 			if (sideEffects == SideEffects::worst())
-				return;
-			if (BuiltinHandle const* builtinHandle = std::get_if<BuiltinHandle>(&_function))
-				sideEffects += _dialect.builtin(*builtinHandle).sideEffects;
-			else
+				continue;
+			SideEffects const previousSideEffects = sideEffects;
+			for (FunctionHandle const& callee: calls)
 			{
-				if (ret.count(_function))
-					sideEffects += ret[_function];
-				for (FunctionHandle const& callee: _directCallGraph.functionCalls.at(_function))
-					_recurse(callee, _recurse);
+				if (BuiltinHandle const* builtinHandle = std::get_if<BuiltinHandle>(&callee))
+					sideEffects += _dialect.builtin(*builtinHandle).sideEffects;
+				else
+					sideEffects += ret.at(callee);
 			}
-		};
-		for (auto const& _v: call.second)
-			_visit(_v, _visit);
-		ret[funName] += sideEffects;
+			changed = !(sideEffects == previousSideEffects) || changed;
+		}
 	}
 	return ret;
 }
