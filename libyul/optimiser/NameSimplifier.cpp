@@ -25,7 +25,9 @@
 
 #include <libsolutil/CommonData.h>
 
+#include <array>
 #include <regex>
+#include <string_view>
 
 using namespace solidity::yul;
 
@@ -101,9 +103,34 @@ void NameSimplifier::findSimplification(YulName const& _name)
 		{std::regex("index_access_(t_)?array"), "index_access"},
 		{std::regex("[0-9]*_$"), ""}
 	};
+	static constexpr std::array<std::string_view, 17> requiredSubstrings{
+		"", "", "", "_t_", "__", "abi_", "stringliteral", "tuple_", "_memory_ptr",
+		"_calldata_ptr", "_fromStack", "_storage_storage", "storage", "_memory_memory",
+		"_contract$_", "index_access_", ""
+	};
 
-	for (auto const& [pattern, substitute]: replacements)
+	for (size_t index = 0; index < replacements.size(); ++index)
 	{
+		auto containsUnderscoreDigit = [&]()
+		{
+			for (size_t character = 0; character + 1 < name.size(); ++character)
+				if (
+					name[character] == '_' &&
+					name[character + 1] >= '0' &&
+					name[character + 1] <= '9'
+				)
+					return true;
+			return false;
+		};
+		bool couldMatch =
+			index == 0 ? name.find("_$") != std::string::npos || name.find("$_") != std::string::npos :
+			index == 1 || index == 2 ? containsUnderscoreDigit() :
+			index == 16 ? !name.empty() && name.back() == '_' :
+			name.find(requiredSubstrings[index]) != std::string::npos;
+		if (!couldMatch)
+			continue;
+
+		auto const& [pattern, substitute] = replacements[index];
 		std::string candidate = regex_replace(name, pattern, substitute);
 		if (!candidate.empty() && !m_context.dispenser.illegalName(YulName(candidate)))
 			name = candidate;
