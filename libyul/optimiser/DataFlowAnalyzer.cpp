@@ -93,7 +93,7 @@ void DataFlowAnalyzer::operator()(ExpressionStatement& _statement)
 
 void DataFlowAnalyzer::operator()(Assignment& _assignment)
 {
-	std::set<YulName> names;
+	AssignmentNames names;
 	for (auto const& var: _assignment.variableNames)
 		names.emplace(var.name);
 	assertThrow(_assignment.value, OptimizerException, "");
@@ -104,7 +104,7 @@ void DataFlowAnalyzer::operator()(Assignment& _assignment)
 
 void DataFlowAnalyzer::operator()(VariableDeclaration& _varDecl)
 {
-	std::set<YulName> names;
+	AssignmentNames names;
 	for (auto const& var: _varDecl.variables)
 		names.emplace(var.name);
 	m_variableScopes.back().variables += names;
@@ -241,7 +241,7 @@ std::optional<YulName> DataFlowAnalyzer::keccakValue(YulName _start, YulName _le
 		return std::nullopt;
 }
 
-void DataFlowAnalyzer::handleAssignment(std::set<YulName> const& _variables, Expression* _value, bool _isDeclaration)
+void DataFlowAnalyzer::handleAssignment(AssignmentNames const& _variables, Expression* _value, bool _isDeclaration)
 {
 	if (!_isDeclaration)
 		clearValues(_variables);
@@ -316,7 +316,8 @@ void DataFlowAnalyzer::popScope()
 	m_variableScopes.pop_back();
 }
 
-void DataFlowAnalyzer::clearValues(std::set<YulName> const& _variablesToClear)
+template <class VariableSet>
+void DataFlowAnalyzer::clearValues(VariableSet const& _variablesToClear)
 {
 	// All variables that reference variables to be cleared also have to be
 	// cleared, but not recursively, since only the value of the original
@@ -356,7 +357,12 @@ void DataFlowAnalyzer::clearValues(std::set<YulName> const& _variablesToClear)
 			referencingVariablesToClear.emplace(referencingVariable);
 
 	// Clear the value and update the reference relation.
-	for (auto const& name: _variablesToClear + referencingVariablesToClear)
+	for (auto const& name: _variablesToClear)
+	{
+		m_state.value.erase(name);
+		m_state.sortedReferences.erase(name);
+	}
+	for (auto const& name: referencingVariablesToClear)
 	{
 		m_state.value.erase(name);
 		m_state.sortedReferences.erase(name);

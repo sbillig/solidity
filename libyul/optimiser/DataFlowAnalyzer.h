@@ -32,6 +32,9 @@
 #include <libsolutil/Numeric.h>
 #include <libsolutil/Common.h>
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+
 #include <map>
 #include <set>
 
@@ -111,18 +114,16 @@ public:
 	std::optional<YulName> keccakValue(YulName _start, YulName _length) const;
 
 protected:
+	using AssignmentNames = boost::container::small_flat_set<YulName, 1>;
+
 	/// Registers the assignment.
-	void handleAssignment(std::set<YulName> const& _names, Expression* _value, bool _isDeclaration);
+	void handleAssignment(AssignmentNames const& _names, Expression* _value, bool _isDeclaration);
 
 	/// Creates a new inner scope.
 	void pushScope(bool _functionScope);
 
 	/// Removes the innermost scope and clears all variables in it.
 	void popScope();
-
-	/// Clears information about the values assigned to the given variables,
-	/// for example at points where control flow is merged.
-	void clearValues(std::set<YulName> const& _variablesToClear);
 
 	virtual void assignValue(YulName _variable, Expression const* _value);
 
@@ -168,6 +169,11 @@ protected:
 	std::map<FunctionHandle, SideEffects> m_functionSideEffects;
 
 private:
+	/// Clears information about the values assigned to the given variables,
+	/// for example at points where control flow is merged.
+	template <class VariableSet>
+	void clearValues(VariableSet const& _variablesToClear);
+
 	struct Environment
 	{
 		util::unordered_flat_map<YulName, YulName> storage;
