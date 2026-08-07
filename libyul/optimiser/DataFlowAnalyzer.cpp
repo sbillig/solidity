@@ -258,27 +258,36 @@ void DataFlowAnalyzer::handleAssignment(small_flat_set<YulName, 1> const& _varia
 		return;
 	}
 
-	MovableChecker movableChecker{m_dialect, &m_functionSideEffects};
-	if (_value)
-		movableChecker.visit(*_value);
-	else
+	bool movable = true;
+	small_vector<YulName, 2> referencedVariables;
+	if (!_value)
 		for (auto const& var: _variables)
 			assignValue(var, &m_zero);
+	else if (Identifier const* identifier = std::get_if<Identifier>(_value))
+		referencedVariables.emplace_back(identifier->name);
+	else if (!std::holds_alternative<Literal>(*_value))
+	{
+		MovableChecker movableChecker{m_dialect, &m_functionSideEffects};
+		movableChecker.visit(*_value);
+		movable = movableChecker.movable();
+		referencedVariables.assign(
+			movableChecker.referencedVariables().begin(),
+			movableChecker.referencedVariables().end()
+		);
+	}
 
 	if (_value && _variables.size() == 1)
 	{
 		YulName name = *_variables.begin();
 		// Expression has to be movable and cannot contain a reference
 		// to the variable that will be assigned to.
-		if (movableChecker.movable() && !movableChecker.referencedVariables().count(name))
+		if (movable && !util::contains(referencedVariables, name))
 			assignValue(name, _value);
 	}
 
-	auto const& referencedVariables = movableChecker.referencedVariables();
-	small_vector<YulName, 2> const referencedVariablesSorted(referencedVariables.begin(), referencedVariables.end());
 	for (auto const& name: _variables)
 	{
-		m_state.sortedReferences[name] = referencedVariablesSorted;
+		m_state.sortedReferences[name] = referencedVariables;
 		if (!_isDeclaration)
 		{
 			// assignment to slot denoted by "name"
@@ -298,7 +307,7 @@ void DataFlowAnalyzer::handleAssignment(small_flat_set<YulName, 1> const& _varia
 	if (_value && _variables.size() == 1)
 	{
 		YulName variable = *_variables.begin();
-		if (!movableChecker.referencedVariables().count(variable))
+		if (!util::contains(referencedVariables, variable))
 		{
 			// This might erase additional knowledge about the slot.
 			// On the other hand, if we knew the value in the slot
