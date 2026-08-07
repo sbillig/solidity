@@ -275,7 +275,7 @@ void DataFlowAnalyzer::handleAssignment(AssignmentNames const& _variables, Expre
 	}
 
 	auto const& referencedVariables = movableChecker.referencedVariables();
-	std::vector const referencedVariablesSorted(referencedVariables.begin(), referencedVariables.end());
+	SortedReferences const referencedVariablesSorted(referencedVariables.begin(), referencedVariables.end());
 	for (auto const& name: _variables)
 	{
 		m_state.sortedReferences[name] = referencedVariablesSorted;

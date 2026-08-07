@@ -84,6 +84,8 @@ struct AssignedValue
 class DataFlowAnalyzer: public ASTModifier
 {
 public:
+	using SortedReferences = boost::container::small_vector<YulName, 2>;
+
 	enum class MemoryAndStorage { Analyze, Ignore };
 	/// Determines whether all movable assigned values or only dependency-free literals are tracked.
 	enum class ValueKnowledge { AllMovable, LiteralsOnly };
@@ -111,7 +113,7 @@ public:
 
 	/// @returns the current value of the given variable, if known - always movable.
 	AssignedValue const* variableValue(YulName _variable) const { return util::valueOrNullptr(m_state.value, _variable); }
-	std::vector<YulName> const* sortedReferences(YulName _variable) const { return util::valueOrNullptr(m_state.sortedReferences, _variable); }
+	SortedReferences const* sortedReferences(YulName _variable) const { return util::valueOrNullptr(m_state.sortedReferences, _variable); }
 	std::map<YulName, AssignedValue> const& allValues() const { return m_state.value; }
 	std::optional<YulName> storageValue(YulName _key) const;
 	std::optional<YulName> memoryValue(YulName _key) const;
@@ -191,7 +193,7 @@ private:
 		std::map<YulName, AssignedValue> value;
 		/// m_references[a].contains(b) <=> the current expression assigned to a references b
 		/// The mapped vectors _must always_ be sorted
-		util::unordered_flat_map<YulName, std::vector<YulName>> sortedReferences;
+		util::unordered_flat_map<YulName, SortedReferences> sortedReferences;
 
 		Environment environment;
 	};
