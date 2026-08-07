@@ -85,14 +85,18 @@ class DataFlowAnalyzer: public ASTModifier
 {
 public:
 	enum class MemoryAndStorage { Analyze, Ignore };
+	/// Determines whether all movable assigned values or only dependency-free literals are tracked.
+	enum class ValueKnowledge { AllMovable, LiteralsOnly };
 	/// @param _functionSideEffects
 	///            Side-effects of user-defined functions. Worst-case side-effects are assumed
 	///            if this is not provided or the function is not found.
 	///            The parameter is mostly used to determine movability of expressions.
+	/// @param _valueKnowledge Limits tracked values to literals when dependency information is not needed.
 	explicit DataFlowAnalyzer(
 		Dialect const& _dialect,
 		MemoryAndStorage _analyzeStores,
-		std::map<FunctionHandle, SideEffects> _functionSideEffects = {}
+		std::map<FunctionHandle, SideEffects> _functionSideEffects = {},
+		ValueKnowledge _valueKnowledge = ValueKnowledge::AllMovable
 	);
 
 	using ASTModifier::operator();
@@ -204,6 +208,7 @@ private:
 	);
 
 	State m_state;
+	ValueKnowledge const m_valueKnowledge;
 
 protected:
 	KnowledgeBase m_knowledgeBase;
