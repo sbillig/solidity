@@ -44,6 +44,7 @@
 #include <libyul/optimiser/LoopInvariantCodeMotion.h>
 #include <libyul/optimiser/StackLimitEvader.h>
 #include <libyul/optimiser/NameDisplacer.h>
+#include <libyul/optimiser/NameSimplifier.h>
 #include <libyul/optimiser/Rematerialiser.h>
 #include <libyul/optimiser/ExpressionSimplifier.h>
 #include <libyul/optimiser/UnusedFunctionParameterPruner.h>
@@ -120,6 +121,14 @@ YulOptimizerTestCommon::YulOptimizerTestCommon(std::shared_ptr<Object const> _ob
 			FunctionHoister::run(*m_context, block);
 			FunctionGrouper::run(*m_context, block);
 			VarNameCleaner::run(*m_context, block);
+			return block;
+		}},
+		{"nameSimplifier", [&]() {
+			auto block = disambiguate();
+			updateContext(block);
+			FunctionHoister::run(*m_context, block);
+			FunctionGrouper::run(*m_context, block);
+			NameSimplifier::run(*m_context, block);
 			return block;
 		}},
 		{"forLoopConditionIntoBody", [&]() {
