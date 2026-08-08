@@ -24,6 +24,9 @@
 
 #include <libsolutil/Visitor.h>
 
+#include <boost/container/flat_map.hpp>
+#include <boost/container/small_vector.hpp>
+
 #include <range/v3/algorithm/all_of.hpp>
 #include <range/v3/algorithm/any_of.hpp>
 #include <range/v3/view/enumerate.hpp>
@@ -390,9 +393,9 @@ public:
 		if (std::holds_alternative<FunctionReturnLabelSlot>(_slot))
 			return m_functionReturnLabelSlotMultiplicity;
 		if (auto* p = std::get_if<VariableSlot>(&_slot))
-			return m_variableSlotMultiplicity[*p];
+			return m_variableSlotMultiplicity[&p->variable.get()];
 		if (auto* p = std::get_if<LiteralSlot>(&_slot))
-			return m_literalSlotMultiplicity[*p];
+			return m_literalSlotMultiplicity[p->value];
 		if (auto* p = std::get_if<TemporarySlot>(&_slot))
 			return m_temporarySlotMultiplicity[*p];
 		yulAssert(std::holds_alternative<JunkSlot>(_slot));
@@ -406,9 +409,9 @@ public:
 		if (std::holds_alternative<FunctionReturnLabelSlot>(_slot))
 			return m_functionReturnLabelSlotMultiplicity;
 		if (auto* p = std::get_if<VariableSlot>(&_slot))
-			return m_variableSlotMultiplicity.at(*p);
+			return m_variableSlotMultiplicity.at(&p->variable.get());
 		if (auto* p = std::get_if<LiteralSlot>(&_slot))
-			return m_literalSlotMultiplicity.at(*p);
+			return m_literalSlotMultiplicity.at(p->value);
 		if (auto* p = std::get_if<TemporarySlot>(&_slot))
 			return m_temporarySlotMultiplicity.at(*p);
 		yulAssert(std::holds_alternative<JunkSlot>(_slot));
@@ -416,11 +419,11 @@ public:
 	}
 
 private:
-	std::map<FunctionCallReturnLabelSlot, int> m_functionCallReturnLabelSlotMultiplicity;
+	boost::container::small_flat_map<FunctionCallReturnLabelSlot, int, 4> m_functionCallReturnLabelSlotMultiplicity;
 	int m_functionReturnLabelSlotMultiplicity = 0;
-	std::map<VariableSlot, int> m_variableSlotMultiplicity;
-	std::map<LiteralSlot, int> m_literalSlotMultiplicity;
-	std::map<TemporarySlot, int> m_temporarySlotMultiplicity;
+	boost::container::small_flat_map<Scope::Variable const*, int, 8> m_variableSlotMultiplicity;
+	boost::container::small_flat_map<u256, int, 4> m_literalSlotMultiplicity;
+	boost::container::small_flat_map<TemporarySlot, int, 2> m_temporarySlotMultiplicity;
 	int m_junkSlotMultiplicity = 0;
 };
 
