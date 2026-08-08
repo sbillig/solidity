@@ -27,7 +27,8 @@
 #include <libyul/optimiser/ASTWalker.h>
 #include <libyul/optimiser/CallGraphGenerator.h>
 
-#include <set>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
 
 namespace solidity::yul
 {
@@ -205,11 +206,14 @@ public:
 	void visit(Statement const&) override;
 	using ASTWalker::visit;
 
-	std::set<YulName> const& referencedVariables() const { return m_variableReferences; }
+	boost::container::small_flat_set<YulName, 4> const& referencedVariables() const
+	{
+		return m_variableReferences;
+	}
 
 private:
 	/// Which variables the current expression references.
-	std::set<YulName> m_variableReferences;
+	boost::container::small_flat_set<YulName, 4> m_variableReferences;
 };
 
 struct ControlFlowSideEffects;
